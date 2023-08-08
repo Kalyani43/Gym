@@ -1,0 +1,172 @@
+module Main where
+
+import DA.Date (toDateUTC)
+
+--Record for address
+data Address = Address with
+    houseNo:Text
+    street:Text
+    city:Text
+    pincode:Int
+        deriving (Show,Eq)
+
+--ContractId type
+type GymSubId = ContractId GymSubscription
+
+-- Enum type for different subscription and gender types
+data SubscriptionType = Yearly | Monthly | PayAsyouGo deriving (Show,Eq)
+data GenderType = Male | Female deriving (Show,Eq)
+
+--Template for eqnuire
+template GymEnquire
+    with
+        member:Party
+        address:Address
+        gym:Party
+    where
+        signatory member
+        observer gym
+
+--member can take free trial
+
+        choice FreeTrial:() 
+            with
+                days:Int
+            controller member 
+            do 
+                return()
+
+--member can get subscription
+
+        choice GetSubscription:GymSubId
+            with
+                membershipId:Int
+                gender:GenderType
+                address:Address
+                plan:SubscriptionType
+                startDate:Date
+                endDate:Date
+                email:Optional Text
+
+            controller member 
+            do
+                now <- getTime 
+                let nowDate = toDateUTC now
+
+                assertMsg "Wrong End Date" (endDate > nowDate)
+
+                create GymSubscription 
+                    with
+                        membershipId = membershipId
+                        gender = gender
+                        address = address
+                        plan = plan
+                        startDate = startDate
+                        endDate = endDate
+                        ..
+ --Template for GymSubscription
+template GymSubscription 
+    with
+        gym:Party
+        member:Party
+        membershipId:Int
+        gender:GenderType
+        address:Address
+        plan:SubscriptionType
+        startDate:Date
+        endDate:Date
+    where
+
+        ensure (startDate<endDate)
+
+        signatory member
+        observer gym
+
+        key(member,membershipId):(Party,Int)
+        maintainer key._1
+
+--member can extend their membership
+
+        nonconsuming choice ExtendMembership:GymSubId
+            with
+                newEndDate:Date
+            controller member
+            do
+                now <- getTime 
+                let nowDate = toDateUTC now
+
+                assertMsg "Wrong End Date" (newEndDate > nowDate)
+
+                exercise self UpdateEndDate with 
+                    newEndDate = newEndDate
+                    
+
+        choice UpdateEndDate:GymSubId      
+            with
+                newEndDate:Date
+            controller member
+            do
+                create this with 
+                    endDate = newEndDate
+
+ --member can update the plan for gymsubscription
+
+        nonconsuming choice UpdateSubscriptionPlan:GymSubId
+            with
+                membershipPlan:SubscriptionType
+            controller member
+            do
+                exercise self UpdatePlan with 
+                    newPlan = membershipPlan
+                    
+        choice UpdatePlan:GymSubId          
+            with
+                newPlan:SubscriptionType
+            controller member
+            do
+                create this with 
+                    plan = newPlan
+
+--gym owner can terminate membership
+
+        choice TerminateMembership:()
+            controller gym
+            do
+                return()
+
+--member pay their payment for membership
+
+        nonconsuming choice PayMembershipFee:ContractId MemberPayment
+            with 
+                fee:Decimal
+            controller member
+            do
+                now <- getTime 
+                let nowDate = toDateUTC now
+                create MemberPayment with
+                    id = this
+                    amount = fee
+                    paymentDate = nowDate
+
+--Template for MemberPayment
+
+template MemberPayment 
+    with
+        id:GymSubscription
+        amount:Decimal
+        paymentDate:Date
+    where
+        signatory id.member
+        observer id.gym
+
+        ensure (amount > 0.00)
+
+--owner can confirm payment done by member
+
+        choice ConfirmPayment : ()
+            controller id.gym
+            do
+               return()
+
+
+    

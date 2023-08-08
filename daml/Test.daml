@@ -1,0 +1,152 @@
+module Test where
+
+import Main 
+
+import Daml.Script
+import DA.Date (date)
+import DA.Date.Types (Month(Aug))
+
+data TestParties = TestParties with
+ owner: Party
+ member1: Party
+ member2: Party
+    deriving (Show,Eq)
+
+-----------------------------------------------------------------------
+-- Function to setup parties
+-----------------------------------------------------------------------  
+
+setupParties: Script TestParties
+setupParties = do
+  owner <- allocateParty "Owner"
+  tiyasa <- allocateParty "Tiyasa"
+  k <- allocateParty "Kalyani"
+
+-----------------------------------------------------------------------
+   -- construct user-ids from text 
+-----------------------------------------------------------------------
+
+  ownerId  <- validateUserId "Owner"
+  member1Id <- validateUserId "Tiyasa"
+  member2Id <- validateUserId "Kalyani"  
+
+-----------------------------------------------------------------------
+    -- create users with the given rights 
+-----------------------------------------------------------------------
+
+  createUser (User ownerId (Some owner)) [CanActAs owner]
+  createUser (User member1Id (Some tiyasa)) [CanActAs tiyasa]
+  createUser (User member2Id (Some k)) [CanActAs k]
+  return $ TestParties
+   with
+    owner = owner
+    member1 = tiyasa
+    member2 = k
+
+----------------------------------------------------------------------
+-- init script
+----------------------------------------------------------------------
+
+testGym = script do
+ 
+    gymParty<-setupParties
+
+ -- Create an instance of Address record
+    let 
+        a1 = Address with
+            houseNo = "72"
+            street = "M G Road"
+            city = "Bangalore"
+            pincode=560105
+
+-- member is doing gym enquiry  
+
+    gymEqnuireID1 <- submit gymParty.member1 do
+        createCmd GymEnquire with 
+            member = gymParty.member1
+            address = a1
+            gym = gymParty.owner
+
+-- member is getting the gym subscription
+
+    gymgSub1<-submit gymParty.member1 do
+        exerciseCmd gymEqnuireID1 GetSubscription 
+            with
+                membershipId = 1
+                gender = Female
+                address = a1
+                plan = Yearly
+                startDate = date 2023 Aug 10
+                endDate = date 2024 Aug 10
+                email = None
+
+-- another member is doing gym enquiry
+
+    gymEqnuireID2 <- submit gymParty.member2 do
+        createCmd GymEnquire with 
+            member = gymParty.member2
+            address = a1
+            gym = gymParty.owner
+
+-- then trying free trial for gym
+
+    submit gymParty.member2 do
+        exerciseCmd gymEqnuireID2 FreeTrial
+            with
+                days = 2
+
+--member submitting the membership payment
+
+    gymSub1_0<-submit gymParty.member1 do
+        exerciseCmd gymgSub1 PayMembershipFee
+            with 
+                fee = 5000.00
+
+--Unhappy path for amount must be greater than zero
+
+    gymSub2_0<-submitMustFail gymParty.member1 do
+        exerciseCmd gymgSub1 PayMembershipFee
+            with 
+                fee = 0.00
+
+--Gym owner confirming the payment done by member
+
+    submit gymParty.owner do
+        exerciseCmd gymSub1_0 ConfirmPayment
+
+--Unhappy path for member can't exercise this choice
+
+    submitMustFail gymParty.member1 do
+        exerciseCmd gymSub1_0 ConfirmPayment            
+
+--member extending the membership
+
+    gymSub1_1<-submit gymParty.member1 do
+        exerciseCmd gymgSub1 ExtendMembership 
+            with 
+                newEndDate = date 2026 Aug 10
+
+    
+    gymSub1_2<-submit gymParty.member1 do
+        exerciseCmd gymSub1_1 ExtendMembership 
+            with 
+                newEndDate = date 2027 Aug 10
+
+--member updating the plan for gym subscription
+
+    gymSub1_3<-submit gymParty.member1 do
+        exerciseCmd gymSub1_2 UpdateSubscriptionPlan
+            with 
+                membershipPlan = PayAsyouGo
+
+--querying the contract key of the member              
+    p1 <- queryContractKey @GymSubscription gymParty.member1 (gymParty.member1,1)
+    debug $ p1
+
+--Gym owner terminating the membership
+    
+    gymSub1_4<-submit gymParty.owner do
+        exerciseCmd gymSub1_3 TerminateMembership
+
+    
+    return()
