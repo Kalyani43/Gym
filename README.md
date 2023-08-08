@@ -38,3 +38,52 @@ To compile and test, run the pre-written script in the `Test.daml` under /daml O
 ```
 $ daml start
 ```
+Test coverage report
+```
+$ daml test --show-coverage
+
+**Test Summary
+**
+daml/Test.daml:setupParties: ok, 0 active contracts, 0 transactions.
+daml/Test.daml:testGym: ok, 0 active contracts, 12 transactions.
+Modules internal to this package:
+- Internal templates
+  3 defined
+  3 (100.0%) created
+  internal templates never created: 0
+- Internal template choices
+  12 defined
+  9 ( 75.0%) exercised
+  internal template choices never exercised: 3
+    Main:GymEnquire:Archive
+    Main:GymSubscription:Archive
+    Main:MemberPayment:Archive
+- Internal interface implementations
+  0 defined
+    0 internal interfaces
+    0 external interfaces
+- Internal interface choices
+  0 defined
+  0 (100.0%) exercised
+  internal interface choices never exercised: 0
+Modules external to this package:
+- External templates
+  0 defined
+  0 (100.0%) created in any tests
+  0 (100.0%) created in internal tests
+  0 (100.0%) created in external tests
+  external templates never created: 0
+- External template choices
+  0 defined
+  0 (100.0%) exercised in any tests
+  0 (100.0%) exercised in internal tests
+  0 (100.0%) exercised in external tests
+  external template choices never exercised: 0
+- External interface implementations
+  0 defined
+- External interface choices
+  0 defined
+  0 (100.0%) exercised in any tests
+  0 (100.0%) exercised in internal tests
+  0 (100.0%) exercised in external tests
+  external interface choices never exercised: 0
