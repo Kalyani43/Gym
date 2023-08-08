@@ -27,8 +27,10 @@ sandbox-options:
 and the following was added:
 
 ```
+init-script: Test:testGym
 exposed-modules:
   - Main
+
 ```
 
 ### IV. Compiling & Testing
